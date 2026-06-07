@@ -61,7 +61,6 @@
 
     <!-- JavaScript logic to connect backend -->
     <script type="module">
-        // Gradio Client ko direct import karna bina npm install kiye
         import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client@0.1.4/dist/index.min.js";
 
         const swapBtn = document.getElementById('swapBtn');
@@ -86,24 +85,27 @@
             swapBtn.innerText = "Processing...";
 
             try {
-                // Aapka bilkul sahi aur accurate backend space address
+                // Connecting to your exact Hugging Face Space
                 const app = await Client.connect("Information295/my-remaker-backend");
                 
-                // Backend function ko call karna
-                const result = await app.predict("/face_swap_func", [
+                // Index 0 ka use kar rahe hain taake default function trigger ho sake
+                const result = await app.predict(0, [
                     targetFile, 
                     sourceFile
                 ]);
 
                 if (result && result.data) {
-                    // Result image show karna
-                    resultImg.src = result.data[0].url;
+                    const outputData = result.data[0];
+                    // Agar object hai toh URL uthayen, warna string directly link banegi
+                    resultImg.src = typeof outputData === 'object' ? outputData.url : outputData;
                     resultImg.classList.remove('hidden');
                     placeholderText.classList.add('hidden');
+                } else {
+                    alert("Backend completed but no image received.");
                 }
             } catch (error) {
-                console.error(error);
-                alert("Error: Check your Hugging Face Space Status.");
+                console.error("Full Error Details:", error);
+                alert("Connection Error: Check your Hugging Face Space Status.");
             } finally {
                 loader.classList.add('hidden');
                 swapBtn.disabled = false;
@@ -112,5 +114,5 @@
         });
     </script>
 </body>
-    </html>
-    
+                        </html>
+                            
