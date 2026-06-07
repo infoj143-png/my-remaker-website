@@ -53,21 +53,16 @@
         </div>
     </main>
 
-    <script>
+    <script type="module">
+        // Using a rock-solid esm delivery endpoint for the client
+        import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client@1.3.0/dist/index.min.js";
+
         const swapBtn = document.getElementById('swapBtn');
         const targetInput = document.getElementById('targetInput');
         const sourceInput = document.getElementById('sourceInput');
         const resultImg = document.getElementById('resultImg');
         const placeholderText = document.getElementById('placeholderText');
         const loader = document.getElementById('loader');
-
-        // File ko Base64 string mein convert karne ka helper
-        const toBase64 = file => new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = error => reject(error);
-        });
 
         swapBtn.addEventListener('click', async () => {
             const targetFile = targetInput.files[0];
@@ -78,52 +73,41 @@
                 return;
             }
 
+            // Show loading state
             loader.classList.remove('hidden');
             swapBtn.disabled = true;
             swapBtn.innerText = "Processing...";
+            resultImg.classList.add('hidden');
+            placeholderText.classList.remove('hidden');
 
             try {
-                // Images ko base64 format mein badalna
-                const targetBase64 = await toBase64(targetFile);
-                const sourceBase64 = await toBase64(sourceFile);
-
-                // Direct Hugging Face API Endpoint ko call karna (Standard Methods)
-                const response = await fetch("https://information295-my-remaker-backend.hf.space/call/face_swap_func", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        data: [targetBase64, sourceBase64]
-                    })
+                // Connect to your exact space address
+                const app = await Client.connect("Information295/my-remaker-backend");
+                
+                // Directly predict using the correct client stream parser
+                const result = await app.predict("/face_swap_func", { 
+                    target_img: targetFile, 
+                    source_img: sourceFile 
                 });
 
-                const json = await response.json();
-                const eventId = json.event_id;
-
-                // Backend se data real-time stream kar ke final result nikalna
-                const resultResponse = await fetch(`https://information295-my-remaker-backend.hf.space/call/face_swap_func/${eventId}`);
-                const textData = await resultResponse.text();
-                
-                // Response se image link extract karna
-                if (textData.includes("data:")) {
-                    const lines = textData.split("\n");
-                    for (let line of lines) {
-                        if (line.startsWith("data:")) {
-                            const dataObj = JSON.parse(line.replace("data: ", ""));
-                            if (dataObj && dataObj[0] && dataObj[0].url) {
-                                resultImg.src = dataObj[0].url;
-                                resultImg.classList.remove('hidden');
-                                placeholderText.classList.add('hidden');
-                                break;
-                            }
-                        }
+                if (result && result.data && result.data[0]) {
+                    const output = result.data[0];
+                    // Handling both object format and direct string URL formats
+                    const imageUrl = typeof output === 'object' ? output.url : output;
+                    
+                    if (imageUrl) {
+                        resultImg.src = imageUrl;
+                        resultImg.classList.remove('hidden');
+                        placeholderText.classList.add('hidden');
+                    } else {
+                        alert("Could not process image url structure.");
                     }
                 } else {
-                    alert("Faces could not be swapped. Try clear images.");
+                    alert("No data received from backend. Try checking your space logs.");
                 }
-
             } catch (error) {
-                console.error(error);
-                alert("API Connection failed. Please check backend is running.");
+                console.error("Error Details:", error);
+                alert("Connection failed or backend error occurred.");
             } finally {
                 loader.classList.add('hidden');
                 swapBtn.disabled = false;
@@ -132,4 +116,5 @@
         });
     </script>
 </body>
-</html>
+    </html>
+    
