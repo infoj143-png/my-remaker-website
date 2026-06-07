@@ -4,12 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Remaker Studio</title>
-    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
 <body class="bg-slate-950 text-white min-h-screen font-sans">
 
-    <!-- Header -->
     <header class="border-b border-slate-800 p-5 text-center">
         <h1 class="text-3xl font-bold bg-gradient-to-r from-purple-500 to-indigo-500 bg-clip-text text-transparent">
             🤖 AI Remaker Studio
@@ -17,10 +15,8 @@
         <p class="text-slate-400 text-sm mt-1">Free Face Swap Dashboard</p>
     </header>
 
-    <!-- Main Content -->
     <main class="max-w-4xl mx-auto p-4 grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
         
-        <!-- Left Side: Inputs -->
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
             <h2 class="text-lg font-semibold">Upload Images</h2>
             
@@ -39,7 +35,6 @@
             </button>
         </div>
 
-        <!-- Right Side: Result -->
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 text-center flex flex-col justify-between">
             <div>
                 <h2 class="text-lg font-semibold mb-4">Result Image</h2>
@@ -49,7 +44,6 @@
                         <p class="text-3xl mb-1">🖼️</p>
                         <p class="text-xs">Your swapped image will appear here</p>
                     </div>
-                    <!-- Loader -->
                     <div id="loader" class="hidden absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center space-y-2">
                         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
                         <p class="text-purple-400 text-xs">Processing on Hugging Face...</p>
@@ -59,16 +53,21 @@
         </div>
     </main>
 
-    <!-- JavaScript logic to connect backend -->
-    <script type="module">
-        import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client@0.1.4/dist/index.min.js";
-
+    <script>
         const swapBtn = document.getElementById('swapBtn');
         const targetInput = document.getElementById('targetInput');
         const sourceInput = document.getElementById('sourceInput');
         const resultImg = document.getElementById('resultImg');
         const placeholderText = document.getElementById('placeholderText');
         const loader = document.getElementById('loader');
+
+        // File ko Base64 string mein convert karne ka helper
+        const toBase64 = file => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = error => reject(error);
+        });
 
         swapBtn.addEventListener('click', async () => {
             const targetFile = targetInput.files[0];
@@ -79,33 +78,52 @@
                 return;
             }
 
-            // UI Loading Show karna
             loader.classList.remove('hidden');
             swapBtn.disabled = true;
             swapBtn.innerText = "Processing...";
 
             try {
-                // Connecting to your exact Hugging Face Space
-                const app = await Client.connect("Information295/my-remaker-backend");
-                
-                // Index 0 ka use kar rahe hain taake default function trigger ho sake
-                const result = await app.predict(0, [
-                    targetFile, 
-                    sourceFile
-                ]);
+                // Images ko base64 format mein badalna
+                const targetBase64 = await toBase64(targetFile);
+                const sourceBase64 = await toBase64(sourceFile);
 
-                if (result && result.data) {
-                    const outputData = result.data[0];
-                    // Agar object hai toh URL uthayen, warna string directly link banegi
-                    resultImg.src = typeof outputData === 'object' ? outputData.url : outputData;
-                    resultImg.classList.remove('hidden');
-                    placeholderText.classList.add('hidden');
+                // Direct Hugging Face API Endpoint ko call karna (Standard Methods)
+                const response = await fetch("https://information295-my-remaker-backend.hf.space/call/face_swap_func", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        data: [targetBase64, sourceBase64]
+                    })
+                });
+
+                const json = await response.json();
+                const eventId = json.event_id;
+
+                // Backend se data real-time stream kar ke final result nikalna
+                const resultResponse = await fetch(`https://information295-my-remaker-backend.hf.space/call/face_swap_func/${eventId}`);
+                const textData = await resultResponse.text();
+                
+                // Response se image link extract karna
+                if (textData.includes("data:")) {
+                    const lines = textData.split("\n");
+                    for (let line of lines) {
+                        if (line.startsWith("data:")) {
+                            const dataObj = JSON.parse(line.replace("data: ", ""));
+                            if (dataObj && dataObj[0] && dataObj[0].url) {
+                                resultImg.src = dataObj[0].url;
+                                resultImg.classList.remove('hidden');
+                                placeholderText.classList.add('hidden');
+                                break;
+                            }
+                        }
+                    }
                 } else {
-                    alert("Backend completed but no image received.");
+                    alert("Faces could not be swapped. Try clear images.");
                 }
+
             } catch (error) {
-                console.error("Full Error Details:", error);
-                alert("Connection Error: Check your Hugging Face Space Status.");
+                console.error(error);
+                alert("API Connection failed. Please check backend is running.");
             } finally {
                 loader.classList.add('hidden');
                 swapBtn.disabled = false;
@@ -114,5 +132,4 @@
         });
     </script>
 </body>
-                        </html>
-                            
+</html>
