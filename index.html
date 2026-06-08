@@ -68,7 +68,7 @@
             const formData = new FormData();
             formData.append('files', file);
 
-            const response = await fetch(`${BACKEND_URL}/upload`, {
+            const response = await fetch(`${BACKEND_URL}/gradio_api/upload`, {
                 method: "POST",
                 body: formData
             });
@@ -108,7 +108,7 @@
                 const sourceUploadedObj = await uploadFileToGradio(sourceFile);
 
                 // 2. Predicting swap execution with accurate array tracking references
-                const response = await fetch(`${BACKEND_URL}/api/predict`, {
+                const response = await fetch(`${BACKEND_URL}/gradio_api/call/face_swap`, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"
