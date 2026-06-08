@@ -8,7 +8,7 @@
 </head>
 <body class="bg-slate-950 text-white min-h-screen font-sans">
 
-    <header class="border-b border-slate-800 p-5 text-center bg-slate-950">
+    <header class="border-b border-slate-800 p-5 text-center">
         <h1 class="text-3xl font-bold bg-gradient-to-r from-purple-500 to-indigo-500 bg-clip-text text-transparent">
             🤖 AI Remaker Studio
         </h1>
@@ -61,16 +61,29 @@
         const placeholderText = document.getElementById('placeholderText');
         const loader = document.getElementById('loader');
 
-        const BACKEND_SPACE = "https://information295-my-remaker-backend.hf.space";
+        const BACKEND_URL = "https://information295-my-remaker-backend.hf.space";
 
-        // Converts image file seamlessly to direct base64 array object string without metadata header breaks
-        function encodeFileAsBase64(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = error => reject(error);
+        // Step 1: Securely upload file using FormData to avoid base64 data overhead limits
+        async function uploadFileToGradio(file) {
+            const formData = new FormData();
+            formData.append('files', file);
+
+            const response = await fetch(`${BACKEND_URL}/upload`, {
+                method: "POST",
+                body: formData
             });
+
+            if (!response.ok) {
+                throw new Error("File server upload chunk failed.");
+            }
+
+            const resultList = await response.json();
+            
+            // Strictly mapped to match the active Gradio API schema reference wrapper
+            return {
+                path: resultList[0],
+                meta: { _type: "gradio.FileData" }
+            };
         }
 
         swapBtn.addEventListener('click', async () => {
@@ -82,7 +95,7 @@
                 return;
             }
 
-            // Setting Interactive Processing Interface States
+            // Setting UI States
             loader.classList.remove('hidden');
             swapBtn.disabled = true;
             swapBtn.innerText = "Processing...";
@@ -90,43 +103,42 @@
             placeholderText.classList.remove('hidden');
 
             try {
-                // Formatting direct assets arrays safely
-                const targetData = await encodeFileAsBase64(targetFile);
-                const sourceData = await encodeFileAsBase64(sourceFile);
+                // 1. Image reference components generated safely via multi-part streams
+                const targetUploadedObj = await uploadFileToGradio(targetFile);
+                const sourceUploadedObj = await uploadFileToGradio(sourceFile);
 
-                // Direct native JSON serialization call to standard prediction layout pipeline route
-                const response = await fetch(`${BACKEND_SPACE}/api/predict`, {
+                // 2. Predicting swap execution with accurate array tracking references
+                const response = await fetch(`${BACKEND_URL}/api/predict`, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        data: [targetData, sourceData],
-                        event_data: null,
-                        fn_index: 0,
-                        trigger_id: null
+                        data: [targetUploadedObj, sourceUploadedObj],
+                        fn_index: 0
                     })
                 });
 
                 if (!response.ok) {
-                    throw new Error("Network response error caught.");
+                    throw new Error("Backend direct processing route broken.");
                 }
 
                 const resData = await response.json();
 
                 if (resData && resData.data && resData.data[0]) {
-                    const outputImage = resData.data[0];
-                    // Render image link output accurately according to target response structure
-                    resultImg.src = typeof outputImage === 'object' ? outputImage.url : outputImage;
+                    const finalOutput = resData.data[0];
+                    
+                    // Assign url dynamically whether string output or object signature
+                    resultImg.src = typeof finalOutput === 'object' ? finalOutput.url : finalOutput;
                     resultImg.classList.remove('hidden');
                     placeholderText.classList.add('hidden');
                 } else {
-                    alert("Face swap function failed. Please check your image parameters or face orientation.");
+                    alert("Face swap failed. Verify if faces are visible clearly inside both templates.");
                 }
 
             } catch (error) {
-                console.error("Pipeline Runtime Error Logged:", error);
-                alert("Processing timed out or connection route failed. Make sure your Hugging Face space is actively 'Running'.");
+                console.error("Pipeline Runtime Error:", error);
+                alert("Connection failed or system response timed out. Make sure your Hugging Face Space is active.");
             } finally {
                 loader.classList.add('hidden');
                 swapBtn.disabled = false;
