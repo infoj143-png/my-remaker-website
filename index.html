@@ -5,51 +5,107 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Remaker Studio</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <style>
-        /* Responsive container for smooth touch and scroll on mobile devices */
-        .iframe-container {
-            position: relative;
-            width: 100%;
-            height: 700px;
-            overflow: hidden;
-            -webkit-overflow-scrolling: touch;
-        }
-        .iframe-container iframe {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            border: 0;
-        }
-    </style>
 </head>
-<body class="bg-slate-950 text-white min-h-screen font-sans flex flex-col">
+<body class="bg-slate-950 text-white min-h-screen font-sans">
 
-    <header class="border-b border-slate-800 p-5 text-center bg-slate-950">
+    <header class="border-b border-slate-800 p-5 text-center">
         <h1 class="text-3xl font-bold bg-gradient-to-r from-purple-500 to-indigo-500 bg-clip-text text-transparent">
             🤖 AI Remaker Studio
         </h1>
         <p class="text-slate-400 text-sm mt-1">Free Face Swap Dashboard</p>
     </header>
 
-    <main class="flex-1 max-w-4xl w-full mx-auto p-4 md:p-6 flex flex-col justify-center">
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-1 shadow-2xl overflow-hidden">
+    <main class="max-w-4xl mx-auto p-4 grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <h2 class="text-lg font-semibold">Upload Images</h2>
             
-            <div class="iframe-container">
-                <iframe 
-                    src="https://hf.space/embed/Information295/my-remaker-backend/+" 
-                    allow="accelerometer; ambient-light-sensor; camera; microphone; gyroscope; geolocation; xr-spatial-tracking; midi; clipboard-write;"
-                    sandbox="allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-downloads">
-                </iframe>
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">Target Image (Main Photo)</label>
+                <input type="file" id="targetInput" accept="image/*" class="w-full text-xs text-slate-400 bg-slate-950 p-3 rounded-xl border border-slate-800">
             </div>
 
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">Source Image (Face to use)</label>
+                <input type="file" id="sourceInput" accept="image/*" class="w-full text-xs text-slate-400 bg-slate-950 p-3 rounded-xl border border-slate-800">
+            </div>
+
+            <button id="swapBtn" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 font-medium py-3 rounded-xl mt-2 active:scale-95 transition">
+                Swap Face Now 🔄
+            </button>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 text-center flex flex-col justify-between">
+            <div>
+                <h2 class="text-lg font-semibold mb-4">Result Image</h2>
+                <div class="bg-slate-950 border border-slate-800 rounded-xl aspect-square flex items-center justify-center overflow-hidden relative">
+                    <img id="resultImg" class="hidden w-full h-full object-contain" />
+                    <div id="placeholderText" class="text-slate-600 p-4">
+                        <p class="text-3xl mb-1">🖼️</p>
+                        <p class="text-xs">Your swapped image will appear here</p>
+                    </div>
+                    <div id="loader" class="hidden absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center space-y-2">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+                        <p class="text-purple-400 text-xs">Processing on Hugging Face...</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 
-    <footer class="text-center p-4 text-xs text-slate-600 border-t border-slate-900">
-        Powered by Hugging Face Embed & Vercel
-    </footer>
+    <script type="module">
+        import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client@1.3.0/dist/index.min.js";
 
+        const swapBtn = document.getElementById('swapBtn');
+        const targetInput = document.getElementById('targetInput');
+        const sourceInput = document.getElementById('sourceInput');
+        const resultImg = document.getElementById('resultImg');
+        const placeholderText = document.getElementById('placeholderText');
+        const loader = document.getElementById('loader');
+
+        swapBtn.addEventListener('click', async () => {
+            const targetFile = targetInput.files[0];
+            const sourceFile = sourceInput.files[0];
+
+            if (!targetFile || !sourceFile) {
+                alert("Please select both images!");
+                return;
+            }
+
+            loader.classList.remove('hidden');
+            swapBtn.disabled = true;
+            swapBtn.innerText = "Processing...";
+            resultImg.classList.add('hidden');
+            placeholderText.classList.remove('hidden');
+
+            try {
+                // Direct client connection bypassing proxies
+                const app = await Client.connect("Information295/my-remaker-backend");
+                
+                // Triggering the main function by hitting the direct active index
+                const result = await app.predict(0, [
+                    targetFile, 
+                    sourceFile
+                ]);
+
+                if (result && result.data && result.data[0]) {
+                    const output = result.data[0];
+                    // Clean handling of returned object url data or absolute strings
+                    resultImg.src = typeof output === 'object' ? output.url : output;
+                    resultImg.classList.remove('hidden');
+                    placeholderText.classList.add('hidden');
+                } else {
+                    alert("Face Swap Processing error: Make sure both images contain a clear face.");
+                }
+            } catch (error) {
+                console.error("Connection Error:", error);
+                alert("API connection failed. Please ensure your Hugging Face space is active.");
+            } finally {
+                loader.classList.add('hidden');
+                swapBtn.disabled = false;
+                swapBtn.innerText = "Swap Face Now 🔄";
+            }
+        });
+    </script>
 </body>
 </html>
