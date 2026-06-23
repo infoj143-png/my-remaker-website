@@ -1,0 +1,14 @@
+# Node dependencies
+node_modules/
+
+# Vercel deployment
+.vercel
+
+# OS files
+.DS_Store
+Thumbs.DB
+.AppleDual.store
+
+# Editors )
+.vscode/
+.vssodes/*
